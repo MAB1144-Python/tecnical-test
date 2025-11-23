@@ -4,6 +4,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 from app.rag_faq import answer_question
+from app.text_to_voice import text_to_speech
 
 # Cargar variables de entorno desde .env si existe
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
@@ -36,6 +37,8 @@ async def ask(payload: dict = Body(...)):
     persist_dir = payload.get("persist_dir")
 
     res = answer_question(question, persist_dir=persist_dir)
+    voice = text_to_speech(res["answer"], lang='es')
+    res["audio_file"] = voice
 
     return JSONResponse(res)
 
