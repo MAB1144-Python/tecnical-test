@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app
 COPY app/ ./app
+# Copy TechnicalInterview folder (FAQ and related files)
+COPY "TechnicalInterview" ./TechnicalInterview
 
 # Expose port
 EXPOSE 8000

@@ -3,10 +3,13 @@ version: '3.8'
 services:
   web:
     build: .
+    env_file:
+      - .env
     ports:
       - '8000:8000'
     volumes:
-      - ./app:/app/app:cached
+      # Montar el proyecto completo en /app para que archivos como TechnicalInterview queden accesibles
+      - ./:/app:cached
     environment:
       - PYTHONUNBUFFERED=1
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

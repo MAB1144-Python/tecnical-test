@@ -1,6 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.responses import JSONResponse
 from typing import Optional
+from dotenv import load_dotenv
+from pathlib import Path
+from app.rag_faq import answer_question
+
+# Cargar variables de entorno desde .env si existe
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="FastAPI Docker Starter")
 
@@ -15,14 +21,23 @@ async def root():
     return {"message": "Hello from FastAPI in Docker!"}
 
 
-@app.post("/text")
-async def receive_text(content: str = Form(...)):
-    """Recibe texto a través de un form field `content`."""
-    if not content.strip():
-        raise HTTPException(status_code=400, detail="Empty content")
-    # Respuesta mínima
-    return JSONResponse({"received": True, "type": "text", "length": len(content)})
+@app.post("/ask")
+async def ask(payload: dict = Body(...)):
+    """Recibe JSON con {"question": "..."} y responde usando el RAG sobre el FAQ.
 
+    Opciones de body:
+    - {"question": "..."}
+    - también se puede pasar "faq_path" o "persist_dir" para controlar el índice.
+    """
+    question = payload.get("question")
+    if not question:
+        raise HTTPException(status_code=400, detail="Missing 'question' in request body")
+
+    persist_dir = payload.get("persist_dir")
+
+    res = answer_question(question, persist_dir=persist_dir)
+
+    return JSONResponse(res)
 
 @app.post("/image")
 async def receive_image(file: UploadFile = File(...)):
@@ -42,3 +57,6 @@ async def receive_audio(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File is not MP3 audio")
     contents = await file.read()
     return {"received": True, "filename": file.filename, "content_type": ct, "size": len(contents)}
+
+
+
