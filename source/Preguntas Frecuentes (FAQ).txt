@@ -42,3 +42,4 @@ R: Puedes usar el botón "Ayuda" dentro de la plataforma o enviar un correo a su
 
 P: ¿El soporte tiene horario de atención?
 R: Sí, de lunes a viernes, 9:00 a 18:00 (hora local).
+

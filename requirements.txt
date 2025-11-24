@@ -15,3 +15,4 @@ langchain_openai>=0.1
 langchain_core>=0.1
 langchain_community>=0.1
 gtts
+pypdf

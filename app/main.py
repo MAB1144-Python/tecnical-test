@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
 from dotenv import load_dotenv
@@ -7,14 +7,21 @@ from app.rag_faq import answer_question
 from app.text_to_voice import text_to_speech
 from app.whisper import transcribe_audio
 from app.text_into_image import extraer_texto_error
+from fastapi.staticfiles import StaticFiles
 import os
 from datetime import datetime
+import shutil
 
 
 # Cargar variables de entorno desde .env si existe
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="FastAPI Docker Starter")
+
+# Mount static directory to serve response audio
+static_dir = os.path.join(os.path.dirname(__file__), 'static')
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.post("/support")
 async def receive_image(text: str = Form(...), image: UploadFile = File(...)):
@@ -48,14 +55,23 @@ async def receive_image(text: str = Form(...), image: UploadFile = File(...)):
         extracted_text = f"image_extraction_error: {str(e)}"
 
     res = answer_question(question, message=extracted_text)
-    voice = text_to_speech(res["answer"], lang='es')
-    res["audio_file"] = voice
-    
+
+    # generate voice answer and copy to static
+    voice_path = text_to_speech(res.get("answer", ""), lang='es')
+    ts2 = datetime.now().strftime('%Y%m%d_%H%M%S')
+    static_name = f"respuesta_{ts2}.mp3"
+    static_path = os.path.join(static_dir, static_name)
+    try:
+        shutil.copy(voice_path, static_path)
+        audio_url = str(request.base_url) + f"static/{static_name}" if request is not None else f"/static/{static_name}"
+    except Exception:
+        audio_url = None
+
     return {
-        "received": True,
-        "image": {"saved_as": i_name, "saved_path": i_path, "size": len(image_bytes)},
-        "extracted_text": extracted_text,
-        "response": res
+        "transcription": extracted_text,
+        "answer": res.get("answer"),
+        "audio_url": audio_url,
+        "source_documents": res.get("source_documents", []),
     }
 
 @app.post("/support/audio")
@@ -103,22 +119,37 @@ async def receive_audio(audio: UploadFile = File(...), image: UploadFile = File(
     with open(i_path, 'wb') as f:
         f.write(image_bytes)
 
-    # Transcribe audio (may raise if no backend)
+    # Transcribe image text
     try:
         extracted_text = extraer_texto_error(i_path)
     except Exception as e:
         extracted_text = f"image_extraction_error: {str(e)}"
-    
+
+    # Transcribe audio
     try:
         transcription = transcribe_audio(a_path)
     except Exception as e:
         transcription = f"transcription_error: {str(e)}"
 
+    # Ask RAG for answer using transcription and extracted image text as message
+    res = answer_question(question=text if 'text' in locals() else '', message=extracted_text)
+
+    # generate voice answer and copy to static
+    voice_path = text_to_speech(res.get("answer", ""), lang='es')
+    ts2 = datetime.now().strftime('%Y%m%d_%H%M%S')
+    static_name = f"respuesta_{ts2}.mp3"
+    static_path = os.path.join(static_dir, static_name)
+    try:
+        shutil.copy(voice_path, static_path)
+        # Build a base URL using localhost as fallback
+        audio_url = f"http://localhost:8000/static/{static_name}"
+    except Exception:
+        audio_url = None
+
     return {
-        "received": True,
-        "audio": {"saved_as": a_name, "saved_path": a_path, "size": len(audio_bytes)},
-        "image": {"saved_as": i_name, "saved_path": i_path, "size": len(image_bytes)},
         "transcription": transcription,
-        "extracted_text": extracted_text
+        "answer": res.get("answer"),
+        "audio_url": audio_url,
+        "source_documents": res.get("source_documents", []),
     }
 

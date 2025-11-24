@@ -14,6 +14,8 @@ COPY app/ ./app
 # Copy TechnicalInterview folder (FAQ and related files)
 COPY "TechnicalInterview" ./TechnicalInterview
 
+COPY "source" ./source
+
 # Expose port
 EXPOSE 8000
 
