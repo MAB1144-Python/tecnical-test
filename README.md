@@ -79,7 +79,7 @@ Rutas principales y ejemplos
 
 Notas de desarrollo
 -------------------
-- Si deseas usar la transcripción local con Whisper, instala `openai-whisper` y asegúrate de que `transcribe_audio` funcione localmente.
+- Si deseas usar la transcripción local con Whisper, instala `openai-whisper` y asegúrate de que `trascription_audio` funcione localmente.
 - El módulo `rag_faq.py` carga documentos desde `source/` y construye un índice FAISS en memoria para responder consultas.
 - Archivos subidos se guardan en `app/input_audio` y `app/input_images`.
 

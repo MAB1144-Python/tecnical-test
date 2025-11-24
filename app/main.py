@@ -1,19 +1,16 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 from app.rag_faq import answer_question
 from app.text_to_voice import text_to_speech
-from app.whisper import transcribe_audio
-from app.text_into_image import extraer_texto_error
+from app.whisper import trascription_audio
+from app.text_into_image import extraction_text
 from fastapi.staticfiles import StaticFiles
 import os
 from datetime import datetime
 import shutil
 
-
-# Cargar variables de entorno desde .env si existe
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="FastAPI Docker Starter")
@@ -24,7 +21,7 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.post("/support")
-async def receive_image(text: str = Form(...), image: UploadFile = File(...), request: Request = None):
+async def receive_image_and_text(text: str = Form(...), image: UploadFile = File(...), request: Request = None):
     question = text
     if not question:
         raise HTTPException(status_code=400, detail="Missing 'text' form field")
@@ -50,7 +47,7 @@ async def receive_image(text: str = Form(...), image: UploadFile = File(...), re
 
     # Transcribe audio (may raise if no backend)
     try:
-        extracted_text = extraer_texto_error(i_path)
+        extracted_text = extraction_text(i_path)
     except Exception as e:
         extracted_text = f"image_extraction_error: {str(e)}"
 
@@ -73,7 +70,7 @@ async def receive_image(text: str = Form(...), image: UploadFile = File(...), re
 
 
 @app.post("/support/audio")
-async def receive_image(audio: UploadFile = File(...), image: UploadFile = File(...), request: Request = None):
+async def receive_image_and_audio(audio: UploadFile = File(...), image: UploadFile = File(...), request: Request = None):
     # --- Validate audio ---
     act = audio.content_type
     a_filename = audio.filename or ""
@@ -100,7 +97,7 @@ async def receive_image(audio: UploadFile = File(...), image: UploadFile = File(
     
     # Transcribe audio
     try:
-        transcription = transcribe_audio(a_path)
+        transcription = trascription_audio(a_path)
     except Exception as e:
         transcription = f"transcription_error: {str(e)}"
         
@@ -129,7 +126,7 @@ async def receive_image(audio: UploadFile = File(...), image: UploadFile = File(
 
     # Transcribe audio (may raise if no backend)
     try:
-        extracted_text = extraer_texto_error(i_path)
+        extracted_text = extraction_text(i_path)
     except Exception as e:
         extracted_text = f"image_extraction_error: {str(e)}"
 

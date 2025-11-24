@@ -8,16 +8,19 @@ def image_to_base64(image_path: str) -> str:
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def extraer_texto_error(imagen_path: str) -> str:
+def extraction_text(imagen_path: str) -> str:
     image_b64 = image_to_base64(imagen_path)
 
     prompt = (
         """
         ## Role
         Extrae TODO el texto que ves en esta captura de pantalla de un software. 
+        ## Task
+        Proporciona TODO el texto que está en la imagen, incluyendo mensajes de error, menús, botones, etc. y presentar lo español e ingles en un mismo texto separado por punto.
         ## Rules
         - Respóndelo tal cual aparece, sin comentar nada más. 
         - Incluye códigos de error, rutas de archivos y mensajes en inglés o español.
+        - Si esta en ingles debes traducirlo al español y poner ambas versiones separadas por punto.
         """
     )
 

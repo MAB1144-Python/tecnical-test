@@ -1,7 +1,7 @@
 import os
 from openai import OpenAI
 
-def transcribe_audio(path: str) -> str:
+def trascription_audio(path: str) -> str:
     client = OpenAI()
     with open(path, "rb") as audio_file:
         resp = client.audio.transcriptions.create(
