@@ -70,13 +70,102 @@ async def receive_image(text: str = Form(...), image: UploadFile = File(...), re
     # Opcional: asegurar string
     audio_url = str(audio_url)
 
-
+    transcription = "Don´t have audio transcription in this endpoint"
     return {
-        "transcription": extracted_text,
+        "transcription": transcription,
+        "extracted_text_of_image": extracted_text,
         "answer": res.get("answer"),
         "audio_url": audio_url,
         "source_documents": res.get("source_documents", []),
     }
+
+
+@app.post("/support_ok")
+async def receive_image(audio: UploadFile = File(...), image: UploadFile = File(...), request: Request = None):
+    # --- Validate audio ---
+    act = audio.content_type
+    a_filename = audio.filename or ""
+    allowed_audio_ct = ("audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave")
+    if act not in allowed_audio_ct and not (a_filename.lower().endswith(".mp3") or a_filename.lower().endswith(".wav")):
+        raise HTTPException(status_code=400, detail="Audio must be MP3 or WAV")
+
+    audio_bytes = await audio.read()
+    
+    # Ensure output directories exist
+    base_dir = os.path.dirname(__file__)
+    audio_dir = os.path.join(base_dir, 'input_audio')
+    os.makedirs(audio_dir, exist_ok=True)
+
+    # Build filenames
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    a_ext = ".mp3" if a_filename.lower().endswith(".mp3") or act.startswith("audio/mpeg") else ".wav"
+    a_name = f"audio_input_{ts}{a_ext}"
+    
+    a_path = os.path.join(audio_dir, a_name)
+    # Write to disk
+    with open(a_path, 'wb') as f:
+        f.write(audio_bytes)
+    
+    # Transcribe audio
+    try:
+        transcription = transcribe_audio(a_path)
+    except Exception as e:
+        transcription = f"transcription_error: {str(e)}"
+        
+    question = transcription
+    if not question:
+        raise HTTPException(status_code=400, detail="Missing 'text' form field")
+    
+    # --- Validate image ---
+    ict = image.content_type
+    i_filename = image.filename or ""
+    if not ict or not ict.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Image must be an image file")
+
+    image_bytes = await image.read()
+    
+    # Ensure output directories exist
+    base_dir = os.path.dirname(__file__)
+    images_dir = os.path.join(base_dir, 'input_images')
+    os.makedirs(images_dir, exist_ok=True)
+    i_ext = os.path.splitext(i_filename)[1] or '.jpg'
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    i_name = f"image_input_{ts}{i_ext}"
+    i_path = os.path.join(images_dir, i_name)
+    with open(i_path, 'wb') as f:
+        f.write(image_bytes)
+
+    # Transcribe audio (may raise if no backend)
+    try:
+        extracted_text = extraer_texto_error(i_path)
+    except Exception as e:
+        extracted_text = f"image_extraction_error: {str(e)}"
+
+    res = answer_question(question, message=extracted_text)
+
+    # Generar audio
+    voice_path = text_to_speech(res.get("answer", ""), lang="es")
+
+    # Nombre fijo (si quieres que siempre sea "respuesta.mp3")
+    static_name = "respuesta.mp3"
+    static_path = os.path.join(static_dir, static_name)
+
+    shutil.copy(voice_path, static_path)
+
+    # Si tienes montado StaticFiles con name="static"
+    audio_url = request.url_for("static", path=static_name)
+    # Opcional: asegurar string
+    audio_url = str(audio_url)
+
+
+    return {
+        "transcription": transcription,
+        "extracted_text_of_image": extracted_text,
+        "answer": res.get("answer"),
+        "audio_url": audio_url,
+        "source_documents": res.get("source_documents", []),
+    }
+
 
 @app.post("/support/audio")
 async def receive_audio(audio: UploadFile = File(...), image: UploadFile = File(...)):
