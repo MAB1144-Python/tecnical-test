@@ -6,6 +6,7 @@ from pathlib import Path
 from app.rag_faq import answer_question
 from app.text_to_voice import text_to_speech
 from app.whisper import transcribe_audio
+from app.text_into_image import extraer_texto_error
 import os
 from datetime import datetime
 
@@ -44,33 +45,67 @@ async def receive_image(file: UploadFile = File(...)):
     return {"received": True, "filename": file.filename, "content_type": file.content_type, "size": len(contents)}
 
 
-@app.post("/support/audio ")
-async def receive_audio(file: UploadFile = File(...)):
-    """Recibe un audio en mp3. Valida que sea audio/mpeg o .mp3."""
+@app.post("/support/audio")
+async def receive_audio(audio: UploadFile = File(...), image: UploadFile = File(...)):
+    """Recibe un audio (mp3/wav) y una imagen; valida tipos, guarda ambos y devuelve rutas y transcripción."""
 
-    ct = file.content_type
-    filename = file.filename or ""
-    # Allow mp3 or wav by content-type or extension
-    allowed_ct = ("audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave")
-    if ct not in allowed_ct and not (filename.lower().endswith(".mp3") or filename.lower().endswith(".wav")):
-        raise HTTPException(status_code=400, detail="File must be MP3 or WAV audio")
+    # --- Validate audio ---
+    act = audio.content_type
+    a_filename = audio.filename or ""
+    allowed_audio_ct = ("audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave")
+    if act not in allowed_audio_ct and not (a_filename.lower().endswith(".mp3") or a_filename.lower().endswith(".wav")):
+        raise HTTPException(status_code=400, detail="Audio must be MP3 or WAV")
 
-    contents = await file.read()
+    audio_bytes = await audio.read()
 
-    # Ensure output directory exists (use 'input_audio')
-    out_dir = os.path.join(os.path.dirname(__file__), 'input_audio')
-    os.makedirs(out_dir, exist_ok=True)
+    # --- Validate image ---
+    ict = image.content_type
+    i_filename = image.filename or ""
+    if not ict or not ict.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Image must be an image file")
 
-    ext = ".mp3" if filename.lower().endswith(".mp3") or ct.startswith("audio/mpeg") else ".wav"
+    image_bytes = await image.read()
+
+    # Ensure output directories exist
+    base_dir = os.path.dirname(__file__)
+    audio_dir = os.path.join(base_dir, 'input_audio')
+    images_dir = os.path.join(base_dir, 'input_images')
+    os.makedirs(audio_dir, exist_ok=True)
+    os.makedirs(images_dir, exist_ok=True)
+
+    # Build filenames
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-    out_name = f"audio_input_{ts}{ext}"
-    out_path = os.path.join(out_dir, out_name)
+    a_ext = ".mp3" if a_filename.lower().endswith(".mp3") or act.startswith("audio/mpeg") else ".wav"
+    i_ext = os.path.splitext(i_filename)[1] or '.jpg'
 
-    # Write file to disk
-    with open(out_path, 'wb') as f:
-        f.write(contents)
+    a_name = f"audio_input_{ts}{a_ext}"
+    i_name = f"image_input_{ts}{i_ext}"
 
-    transcription = transcribe_audio(out_path)
+    a_path = os.path.join(audio_dir, a_name)
+    i_path = os.path.join(images_dir, i_name)
 
-    return {"received": True, "saved_as": out_name, "saved_path": out_path, "size": len(contents), "transcription": transcription}
+    # Write to disk
+    with open(a_path, 'wb') as f:
+        f.write(audio_bytes)
+    with open(i_path, 'wb') as f:
+        f.write(image_bytes)
+
+    # Transcribe audio (may raise if no backend)
+    try:
+        extracted_text = extraer_texto_error(i_path)
+    except Exception as e:
+        extracted_text = f"image_extraction_error: {str(e)}"
+    
+    try:
+        transcription = transcribe_audio(a_path)
+    except Exception as e:
+        transcription = f"transcription_error: {str(e)}"
+
+    return {
+        "received": True,
+        "audio": {"saved_as": a_name, "saved_path": a_path, "size": len(audio_bytes)},
+        "image": {"saved_as": i_name, "saved_path": i_path, "size": len(image_bytes)},
+        "transcription": transcription,
+        "extracted_text": extracted_text
+    }
 
