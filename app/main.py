@@ -24,7 +24,7 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.post("/support")
-async def receive_image(text: str = Form(...), image: UploadFile = File(...)):
+async def receive_image(text: str = Form(...), image: UploadFile = File(...), request: Request = None):
     question = text
     if not question:
         raise HTTPException(status_code=400, detail="Missing 'text' form field")
@@ -56,16 +56,20 @@ async def receive_image(text: str = Form(...), image: UploadFile = File(...)):
 
     res = answer_question(question, message=extracted_text)
 
-    # generate voice answer and copy to static
-    voice_path = text_to_speech(res.get("answer", ""), lang='es')
-    ts2 = datetime.now().strftime('%Y%m%d_%H%M%S')
-    static_name = f"respuesta_{ts2}.mp3"
+    # Generar audio
+    voice_path = text_to_speech(res.get("answer", ""), lang="es")
+
+    # Nombre fijo (si quieres que siempre sea "respuesta.mp3")
+    static_name = "respuesta.mp3"
     static_path = os.path.join(static_dir, static_name)
-    try:
-        shutil.copy(voice_path, static_path)
-        audio_url = str(request.base_url) + f"static/{static_name}" if request is not None else f"/static/{static_name}"
-    except Exception:
-        audio_url = None
+
+    shutil.copy(voice_path, static_path)
+
+    # Si tienes montado StaticFiles con name="static"
+    audio_url = request.url_for("static", path=static_name)
+    # Opcional: asegurar string
+    audio_url = str(audio_url)
+
 
     return {
         "transcription": extracted_text,
