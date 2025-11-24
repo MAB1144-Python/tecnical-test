@@ -30,24 +30,20 @@ except Exception:
 
 def answer_question(
     query: str,
-    persist_dir: Optional[str] = None,
+    message: str,
     top_k: int = 4,
     embedding_model: str = "text-embedding-3-small",
     llm_model: str = "gpt-4.1-mini",
     api_key: Optional[str] = None,
 ):
     """Responde una pregunta usando RAG.
-
-    Si `persist_dir` contiene un índice lo carga; si no, requiere `faq_path`.
     """
-
-    # usar ruta relativa desde la raíz del proyecto
     project_root = Path(__file__).resolve().parents[1]
     faq_path = project_root / "TechnicalInterview" / "Preguntas Frecuentes (FAQ).txt"
 
-    # Permitir pasar la api_key directamente
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+    # # Permitir pasar la api_key directamente
+    # if api_key:
+    #     os.environ["OPENAI_API_KEY"] = api_key
 
     if not os.environ.get("OPENAI_API_KEY"):
         raise ValueError(
@@ -57,15 +53,12 @@ def answer_question(
     embeddings = OpenAIEmbeddings(model=embedding_model)
     store = None
 
-
     # construir en memoria (igual que build_faq_index)
     faq_path_obj = faq_path.resolve() if not faq_path.is_absolute() else faq_path
     print(faq_path_obj)
-    # Debug: listar archivos en la carpeta `app` del proyecto en logs de arranque
-    project_app_dir = Path(__file__).resolve().parents[1] / "app"
     
     if not faq_path_obj.exists():
-        raise FileNotFoundError(f"FAQ not found************: {faq_path_obj}")
+        raise FileNotFoundError(f"FAQ not found: {faq_path_obj}")
 
     faq_text = faq_path_obj.read_text(encoding="utf-8")
     docs = [Document(page_content=faq_text, metadata={"source": str(faq_path_obj)})]
@@ -86,6 +79,10 @@ def answer_question(
 ## Role
 Eres un asistente de soporte de la plataforma SoftHelp.
 
+## Tasks
+Analizar el **input** que esta compuesto por un mensaje del usuario (**Message_User**)
+y un texto de un mensaje que le aparece en pantalla (**Message_System**). Responder preguntas sobre el FAQ.
+
 ## Rules
 - Responde en español de forma clara y breve usando EXCLUSIVAMENTE la información del contexto.
 - Si la respuesta no está en el contexto, responde: "No encuentro esa información en las preguntas frecuentes."
@@ -104,13 +101,11 @@ Responde solo con el texto de la respuesta, sin comillas ni formato adicional. e
 
     document_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, document_chain)
+    
+    input_data = f"""Message_User: {query}
+Message_System: {message}\n"""
 
-    # Ejecutar chain
-    try:
-        resp = rag_chain.invoke({"input": query})
-    except Exception:
-        # algunos bindings usan run
-        resp = {"answer": rag_chain.run(query)}
+    resp = rag_chain.invoke({"input": input_data})
     # Normalizar respuesta
     answer = None
     if isinstance(resp, dict):

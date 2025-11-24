@@ -12,9 +12,13 @@ def extraer_texto_error(imagen_path: str) -> str:
     image_b64 = image_to_base64(imagen_path)
 
     prompt = (
-        "Extrae TODO el texto que ves en esta captura de pantalla de un software. "
-        "Respóndelo tal cual aparece, sin comentar nada más. "
-        "Incluye códigos de error, rutas de archivos y mensajes en inglés o español."
+        """
+        ## Role
+        Extrae TODO el texto que ves en esta captura de pantalla de un software. 
+        ## Rules
+        - Respóndelo tal cual aparece, sin comentar nada más. 
+        - Incluye códigos de error, rutas de archivos y mensajes en inglés o español.
+        """
     )
 
     response = client.responses.create(

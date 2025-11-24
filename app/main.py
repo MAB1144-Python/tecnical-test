@@ -16,34 +16,47 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="FastAPI Docker Starter")
 
-@app.post("/ask")
-async def ask(payload: dict = Body(...)):
-    """Recibe JSON con {"question": "..."} y responde usando el RAG sobre el FAQ.
-
-    Opciones de body:
-    - {"question": "..."}
-    - también se puede pasar "faq_path" o "persist_dir" para controlar el índice.
-    """
-    question = payload.get("question")
+@app.post("/support")
+async def receive_image(text: str = Form(...), image: UploadFile = File(...)):
+    question = text
     if not question:
-        raise HTTPException(status_code=400, detail="Missing 'question' in request body")
+        raise HTTPException(status_code=400, detail="Missing 'text' form field")
+    
+    # --- Validate image ---
+    ict = image.content_type
+    i_filename = image.filename or ""
+    if not ict or not ict.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Image must be an image file")
 
-    persist_dir = payload.get("persist_dir")
+    image_bytes = await image.read()
+    
+    # Ensure output directories exist
+    base_dir = os.path.dirname(__file__)
+    images_dir = os.path.join(base_dir, 'input_images')
+    os.makedirs(images_dir, exist_ok=True)
+    i_ext = os.path.splitext(i_filename)[1] or '.jpg'
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    i_name = f"image_input_{ts}{i_ext}"
+    i_path = os.path.join(images_dir, i_name)
+    with open(i_path, 'wb') as f:
+        f.write(image_bytes)
 
-    res = answer_question(question, persist_dir=persist_dir)
+    # Transcribe audio (may raise if no backend)
+    try:
+        extracted_text = extraer_texto_error(i_path)
+    except Exception as e:
+        extracted_text = f"image_extraction_error: {str(e)}"
+
+    res = answer_question(question, message=extracted_text)
     voice = text_to_speech(res["answer"], lang='es')
     res["audio_file"] = voice
-
-    return JSONResponse(res)
-
-@app.post("/image")
-async def receive_image(file: UploadFile = File(...)):
-    """Recibe una imagen como archivo. Se valida content-type básico."""
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File is not an image")
-    contents = await file.read()
-    return {"received": True, "filename": file.filename, "content_type": file.content_type, "size": len(contents)}
-
+    
+    return {
+        "received": True,
+        "image": {"saved_as": i_name, "saved_path": i_path, "size": len(image_bytes)},
+        "extracted_text": extracted_text,
+        "response": res
+    }
 
 @app.post("/support/audio")
 async def receive_audio(audio: UploadFile = File(...), image: UploadFile = File(...)):
