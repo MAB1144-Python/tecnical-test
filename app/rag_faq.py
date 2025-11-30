@@ -164,7 +164,7 @@ y un texto de un mensaje que le aparece en pantalla (**Message_System**). Respon
 {input}
 
 ## OUTPUT FORMAT
-Responde solo con el texto de la respuesta, sin comillas ni formato adicional, en texto plano.
+Responde solo con el texto de la respuesta en idioma frances, sin comillas ni formato adicional, en texto plano en idioma frances, respuesta debe entregarse en frances.
 """
     )
 

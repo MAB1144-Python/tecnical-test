@@ -53,7 +53,7 @@ async def receive_image_and_text(text: str = Form(...), image: UploadFile = File
 
     res = answer_question(question, message=extracted_text)
 
-    voice_path = text_to_speech(res.get("answer", ""), lang="es")
+    voice_path = text_to_speech(res.get("answer", ""), lang="fr")
     static_name = "respuesta.mp3"
     audio_url = request.url_for("static", path=static_name)
     # Opcional: asegurar string
@@ -131,7 +131,7 @@ async def receive_image_and_audio(audio: UploadFile = File(...), image: UploadFi
         extracted_text = f"image_extraction_error: {str(e)}"
 
     res = answer_question(question, message=extracted_text)
-    voice_path = text_to_speech(res.get("answer", ""), lang="es")
+    voice_path = text_to_speech(res.get("answer", ""), lang="fr")
     static_name = "respuesta.mp3"
     audio_url = request.url_for("static", path=static_name)
     audio_url = str(audio_url)
