@@ -3,7 +3,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 from app.rag_faq import answer_question
-from app.text_to_voice import text_to_speech
+from app.text_to_voice import text_to_speech, text_to_speech_openai_stream
 from app.whisper import trascription_audio
 from app.text_into_image import extraction_text
 from fastapi.staticfiles import StaticFiles
@@ -143,4 +143,35 @@ async def receive_image_and_audio(audio: UploadFile = File(...), image: UploadFi
         "answer": res.get("answer"),
         "audio_url": audio_url,
         "source_documents": res.get("source_documents", []),
+    }
+    
+    
+@app.post("/text_to_voice")
+async def receive_image_and_text(text: str = Form(...), language: str = Form("es"), request: Request = None):
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing 'text' form field")
+
+    if language not in ["es", "en"]:
+        raise HTTPException(status_code=400, detail="Language must be 'es' or 'en'")
+    voice_path = text_to_speech(text, lang=language)
+    # Voice	Descripción
+    # alloy	Voz estándar, clara y neutral.
+    # verse	Voz cálida, más natural.
+    # sage	Seria y profesional.
+    # sol	Más dinámica y expresiva.
+    # shimmer	Suave, femenina y cálida.
+    # character	Más caricaturesca / expresiva.
+    # Stream audio to file
+    voice_path_2 = text_to_speech_openai_stream(text, voice='verse', model='gpt-4o-mini-tts')
+    static_name = "respuesta.mp3"
+    audio_url = request.url_for("static", path=static_name)
+    # Opcional: asegurar string
+    audio_url = str(audio_url)
+    static_name_2 = "respuesta_2.mp3"
+    audio_url_2 = request.url_for("static", path=static_name_2)
+    # Opcional: asegurar string
+    audio_url_2 = str(audio_url_2)
+    return {
+        "audio_url": audio_url,
+        "audio_url_2": audio_url_2
     }
